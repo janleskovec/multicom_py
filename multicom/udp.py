@@ -22,8 +22,8 @@ class UdpDevice(Device):
         self.addr = addr
         self.port = port
     
-    def send(self):
-        ...
+    def send(self, data):
+        self.channel.sock.sendto(bytes(data), (self.addr, self.port))
 
 
 class UdpChannel(Channel):
@@ -62,6 +62,9 @@ class UdpChannel(Channel):
                         # dev_id is used as the key
                         # if dev object should be persistent, check first
                         self.devices[ddata.dev_id] = UdpDevice(self, ddata, addr[0], addr[1])
+                elif data[0] == PacketType.PING.value[0]:
+                    msg = data[1:].decode('ascii')
+                    print(f'ping response from: {addr}, msg: "{msg}"')
             except socket.timeout:
                 break
 

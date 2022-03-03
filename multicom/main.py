@@ -2,6 +2,8 @@ from typing import List, Set, Tuple
 
 import asyncio
 
+from multicom.packet import PacketType
+
 
 class DiscoveryData():
     """
@@ -30,6 +32,13 @@ class Device():
 
     def __init__(self, dev_data: DiscoveryData):
         self.dev_data = dev_data
+    
+    def send(self, data): pass
+    
+    def ping(self):
+        self.send(
+            [PacketType.PING.value[0]]
+        )
 
 
 class Channel():
@@ -83,4 +92,9 @@ class Client():
                 devices.add(key)
 
         return devices
+    
+    def __getitem__(self, key) -> Device:
+        for ch in self.channels:
+            if key in ch.devices:
+                return ch.devices[key]
 
