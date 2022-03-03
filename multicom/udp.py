@@ -16,8 +16,8 @@ class UdpDevice(Device):
     Udp device implementation
     """
 
-    def __init__(self, channel, discovery_msg: str, addr: str, port: int):
-        super().__init__(discovery_msg)
+    def __init__(self, channel, dev_data: DiscoveryData, addr: str, port: int):
+        super().__init__(dev_data)
         self.channel = channel # to access the socket
         self.addr = addr
         self.port = port
@@ -56,12 +56,12 @@ class UdpChannel(Channel):
             try:
                 data, addr = self.sock.recvfrom(2560)
                 if data[0] == PacketType.DISCOVERY_HELO.value[0]:
-                    msg = data[1:].decode('utf-8')
-                    if '\0' in msg: msg = msg.split('\0')[0]
-                    print(f'msg: {msg}, addr: {addr}')
-                    # hellomsg is used as the key
-                    # if dev object should be persistent, check first
-                    self.devices[msg] = UdpDevice(self, msg, addr[0], addr[1])
+                    ddata = DiscoveryData(data[1:])
+                    #print(f'ddata: {ddata}, addr: {addr}')
+                    if ddata.dev_id != None:
+                        # dev_id is used as the key
+                        # if dev object should be persistent, check first
+                        self.devices[ddata.dev_id] = UdpDevice(self, ddata, addr[0], addr[1])
             except socket.timeout:
                 break
 

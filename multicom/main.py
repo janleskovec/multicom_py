@@ -3,13 +3,33 @@ from typing import List, Set, Tuple
 import asyncio
 
 
+class DiscoveryData():
+    """
+    Discovery packet data parser
+    """
+
+    def __init__(self, discovery_msg: bytes):
+        try:
+            _decoded = discovery_msg.decode('ascii').split('\0')
+            self.fw_id = _decoded[0]
+            self.dev_id = _decoded[1]
+            self.api_ver = int(_decoded[2])
+        # parsing failed
+        except Exception:
+            self.fw_id = None
+            self.dev_id = None
+            self.api_ver = None
+    
+    def __str__(self) -> str:
+        return f'(fw_id: "{self.fw_id}", dev_id: "{self.dev_id}", api_ver: "{self.api_ver}")'
+
 class Device():
     """
     Base class for generated device objects
     """
 
-    def __init__(self, discovery_msg: str):
-        self.discovery_msg = discovery_msg
+    def __init__(self, dev_data: DiscoveryData):
+        self.dev_data = dev_data
 
 
 class Channel():
