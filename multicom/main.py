@@ -66,15 +66,21 @@ class Session():
         self.dev_id = dev_id
 
         self.nonce = 1 # must start with 1
-        self.id = list([random.randint(0,255) for _ in range(4)])
+        self.id = bytes([random.randint(0,255) for _ in range(4)])
     
     def __enter__(self): return self
     def __exit__(self, exc_type, exc_value, tb): pass
+
+    def _on_msg(self, data):
+        pckt_type = PacketType(data[0])
+        session_id = data[1:5]
+        if pckt_type == PacketType.PING:
+            print(f'ping reply from {self.dev_id}')
     
     def ping(self):
         self.client.get_device(self.dev_id).send(
-            [PacketType.PING.value[0]] +
-            self.id
+            [PacketType.PING.value] +
+            list(self.id)
         )
 
 
@@ -85,6 +91,7 @@ class Client():
 
     def __init__(self):
         self.channels = []
+        self.sessions = {}
 
     def add_channel(self, channel: Channel):
         # prevent duplicate channel types
@@ -96,13 +103,16 @@ class Client():
         channel.client = self
 
     def _on_msg(self, channel: Channel, data: bytes, extra_data):
-        if data[0] == PacketType.DISCOVERY_HELO.value[0]:
+        pckt_type = PacketType(data[0])
+        session_id = data[1:5]
+        if pckt_type == PacketType.DISCOVERY_HELO:
             ddata = DiscoveryData(data[1:])
             if ddata.dev_id != None:
                 channel.add_update_device(ddata, extra_data)
-        elif data[0] == PacketType.PING.value[0]:
-            msg = data[1:]
-            print(f'ping response from: {extra_data}, msg: {msg}')
+        else:
+            if session_id in self.sessions:
+                self.sessions[session_id]._on_msg(data)
+            
     
     def send_discover(self) -> Tuple[asyncio.AbstractEventLoop, List[asyncio.Task]]:
         loop = asyncio.get_event_loop()
@@ -138,5 +148,6 @@ class Client():
     def open(self, dev_id: str):
         device = self.get_device(dev_id)
         if device != None:
-            return Session(self, dev_id)
-
+            new_session = Session(self, dev_id)
+            self.sessions[new_session.id] = new_session
+            return new_session
