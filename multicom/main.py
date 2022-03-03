@@ -54,6 +54,11 @@ class Client():
         self.channels = []
 
     def add_channel(self, channel: Channel):
+        # prevent duplicate channel types
+        for c in self.channels:
+            if type(c) == type(channel): return
+        
+        # add to list
         self.channels.append(channel)
     
     def send_discover(self) -> Tuple[asyncio.AbstractEventLoop, List[asyncio.Task]]:
