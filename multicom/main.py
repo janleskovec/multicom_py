@@ -68,9 +68,7 @@ class Session():
         self.nonce = 1 # must start with 1
         self.id = list([random.randint(0,255) for _ in range(4)])
     
-    def __enter__(self):
-        return self
-
+    def __enter__(self): return self
     def __exit__(self, exc_type, exc_value, tb): pass
     
     def ping(self):
