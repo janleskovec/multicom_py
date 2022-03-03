@@ -55,16 +55,7 @@ class UdpChannel(Channel):
         while True:
             try:
                 data, addr = self.sock.recvfrom(2560)
-                if data[0] == PacketType.DISCOVERY_HELO.value[0]:
-                    ddata = DiscoveryData(data[1:])
-                    #print(f'ddata: {ddata}, addr: {addr}')
-                    if ddata.dev_id != None:
-                        # dev_id is used as the key
-                        # if dev object should be persistent, check first
-                        self.devices[ddata.dev_id] = UdpDevice(self, ddata, addr[0], addr[1])
-                elif data[0] == PacketType.PING.value[0]:
-                    msg = data[1:].decode('ascii')
-                    print(f'ping response from: {addr}, msg: "{msg}"')
+                self.client._on_msg(self, data, addr)
             except socket.timeout:
                 break
 
@@ -76,3 +67,9 @@ class UdpChannel(Channel):
         for _ in range(5):
             self.sock.sendto(MESSAGE, (self.broadcast, self.target_port))
             await asyncio.sleep(0.2)
+    
+    def add_update_device(self, dev_data: DiscoveryData, extra_data):
+        addr, port = extra_data
+        # dev_id is used as the key
+        # if dev object should be persistent, check first
+        self.devices[dev_data.dev_id] = UdpDevice(self, dev_data, addr, port)

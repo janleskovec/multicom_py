@@ -12,7 +12,8 @@ def main():
     devices = client.discover_wait()
     print('devices:', devices)
 
-    client[list(devices)[0]].ping()
+    client.open(list(devices)[0]).ping()
+    #client[list(devices)[0]].ping()
 
     time.sleep(1) # wait for ping response
 

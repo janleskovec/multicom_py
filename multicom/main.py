@@ -1,6 +1,8 @@
+from http import client
 from typing import List, Set, Tuple
 
 import asyncio
+import random
 
 from multicom.packet import PacketType
 
@@ -33,12 +35,8 @@ class Device():
     def __init__(self, dev_data: DiscoveryData):
         self.dev_data = dev_data
     
-    def send(self, data): pass
-    
-    def ping(self):
-        self.send(
-            [PacketType.PING.value[0]]
-        )
+    def send(self, data):
+        raise NotImplementedError("Please Implement this method")
 
 
 class Channel():
@@ -51,7 +49,30 @@ class Channel():
         # dict with devices
         self.devices = { }
 
-    async def start_discovery(self): pass
+    async def start_discovery(self):
+        raise NotImplementedError("Please Implement this method")
+
+    def add_update_device(self, dev_data: DiscoveryData, extra_data):
+        raise NotImplementedError("Please Implement this method")
+
+
+class Session():
+    """
+    Session class (manages nonce counters and message queues)
+    """
+
+    def __init__(self, client, dev_id: str):
+        self.client = client
+        self.dev_id = dev_id
+
+        self.nonce = 1 # must start with 1
+        self.id = list([random.randint(0,255) for _ in range(4)])
+    
+    def ping(self):
+        self.client.get_device(self.dev_id).send(
+            [PacketType.PING.value[0]] +
+            self.id
+        )
 
 
 class Client():
@@ -69,10 +90,20 @@ class Client():
         
         # add to list
         self.channels.append(channel)
+        channel.client = self
+
+    def _on_msg(self, channel: Channel, data: bytes, extra_data):
+        if data[0] == PacketType.DISCOVERY_HELO.value[0]:
+            ddata = DiscoveryData(data[1:])
+            if ddata.dev_id != None:
+                channel.add_update_device(ddata, extra_data)
+        elif data[0] == PacketType.PING.value[0]:
+            msg = data[1:]
+            print(f'ping response from: {extra_data}, msg: {msg}')
     
     def send_discover(self) -> Tuple[asyncio.AbstractEventLoop, List[asyncio.Task]]:
         loop = asyncio.get_event_loop()
-        tasks = []
+        tasks = [ ]
         for ch in self.channels:
             tasks.append(loop.create_task(ch.start_discovery()))
 
@@ -92,9 +123,17 @@ class Client():
                 devices.add(key)
 
         return devices
+
+    def get_device(self, dev_id: str) -> Device:
+        for ch in self.channels:
+            if dev_id in ch.devices:
+                return ch.devices[dev_id]
     
     def __getitem__(self, key) -> Device:
-        for ch in self.channels:
-            if key in ch.devices:
-                return ch.devices[key]
+        return self.get_device(key)
+
+    def open(self, dev_id: str):
+        device = self.get_device(dev_id)
+        if device != None:
+            return Session(self, dev_id)
 
