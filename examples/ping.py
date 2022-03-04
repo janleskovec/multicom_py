@@ -20,13 +20,13 @@ async def main():
         lost = 0
         ms_sum = 0
         start_time = time.time_ns()
-        for i in range(50):
+        for i in range(1000):
             ping_time = await session.ping()
             if ping_time != None:
                 ms_sum += ping_time
-                print(f'{ping_time:.02f}ms')
+                #print(f'{ping_time:.02f}ms')
             else:
-                print('ping timeout')
+                #print('ping timeout')
                 lost += 1
         num = i+1
         total_time_s = (time.time_ns() - start_time) / (10**9)
