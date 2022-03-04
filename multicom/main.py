@@ -1,8 +1,10 @@
 from http import client
+from tracemalloc import start
 from typing import List, Set, Tuple
 
 import asyncio
 import random
+import time
 
 from multicom.packet import PacketType
 
@@ -65,23 +67,52 @@ class Session():
         self.client = client
         self.dev_id = dev_id
 
+        self.timeout = 4
+
         self.nonce = 1 # must start with 1
         self.id = bytes([random.randint(0,255) for _ in range(4)])
+
+        self.ping_queue = { }
     
     def __enter__(self): return self
     def __exit__(self, exc_type, exc_value, tb): pass
 
     def _on_msg(self, data):
         pckt_type = PacketType(data[0])
-        session_id = data[1:5]
+        # session_id = data[1:5] # unused
+        msg = data[5:]
         if pckt_type == PacketType.PING:
-            print(f'ping reply from {self.dev_id}')
+            if msg in self.ping_queue:
+                # complete future thread-safely
+                future = self.ping_queue[msg]
+                loop = future.get_loop()
+                loop.call_soon_threadsafe(future.set_result, True)
     
-    def ping(self):
+    async def ping(self):
+        loop = asyncio.get_running_loop()
+        on_completed = loop.create_future()
+
+        ping_nonce = bytes([random.randint(0,255) for _ in range(4)])
+
+        start_time = time.time_ns()
+
         self.client.get_device(self.dev_id).send(
             [PacketType.PING.value] +
-            list(self.id)
+            list(self.id) +
+            list(ping_nonce)
         )
+
+        self.ping_queue[ping_nonce] = on_completed
+
+        on_completed = asyncio.wait_for(on_completed, timeout=self.timeout)
+
+        try:
+            await on_completed
+            return (time.time_ns() - start_time) / (10**6)
+        except asyncio.exceptions.TimeoutError:
+            print('ping timeout')
+
+        del self.ping_queue[ping_nonce]
 
 
 class Client():
@@ -115,20 +146,21 @@ class Client():
             
     
     def send_discover(self) -> Tuple[asyncio.AbstractEventLoop, List[asyncio.Task]]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         tasks = [ ]
         for ch in self.channels:
             tasks.append(loop.create_task(ch.start_discovery()))
 
-        return loop, tasks
+        return tasks
 
-    def discover_wait(self, wait_s=4) -> Set[str]:
+    async def discover_wait(self, wait_s=4) -> Set[str]:
+        loop = asyncio.get_running_loop()
 
-        loop, tasks = self.send_discover()
+        tasks = self.send_discover()
         tasks.append(loop.create_task(asyncio.sleep(wait_s)))
 
         for f in tasks:
-            loop.run_until_complete(f)
+            await f
         
         devices = set()
         for c in self.channels:
