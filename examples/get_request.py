@@ -16,7 +16,7 @@ async def main():
     device_id = list(devices)[0]
 
     with client.open(device_id) as session:
-        response = await session.get('example', data='hello')
+        response = await session.get('exampleee', data='hello')
         print(f'response from "{device_id}": "{response}"')
 
 if __name__  == '__main__': asyncio.run(main())

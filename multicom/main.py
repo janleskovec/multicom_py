@@ -89,7 +89,10 @@ class Session():
             future = self.request_futures[nonce]
             loop = future.get_loop()
 
-            if pckt_type == PacketType.PING:
+            if pckt_type == PacketType.NOT_FOUND:
+                print('not found') # TODO: exception handling?
+                loop.call_soon_threadsafe(future.set_result, None)
+            elif pckt_type == PacketType.PING:
                 loop.call_soon_threadsafe(future.set_result, True)
             elif pckt_type == PacketType.GET_REPLY:
                 msg_strings = msg.decode('ascii').split('\0')
