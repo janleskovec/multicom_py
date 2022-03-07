@@ -72,7 +72,7 @@ class Session():
         self.nonce = 1 # must start with 1
         self.id = bytes([random.randint(0,255) for _ in range(4)])
 
-        self.ping_queue = { }
+        self.request_futures = { }
     
     def __enter__(self): return self
     def __exit__(self, exc_type, exc_value, tb): pass
@@ -80,29 +80,35 @@ class Session():
     def _on_msg(self, data):
         pckt_type = PacketType(data[0])
         # session_id = data[1:5] # unused
-        msg = data[5:]
-        if pckt_type == PacketType.PING:
-            if msg in self.ping_queue:
-                # complete future thread-safely
-                future = self.ping_queue[msg]
-                loop = future.get_loop()
+        nonce = data[5:9]
+        msg = data[9:]
+        msg_strings = msg.decode('ascii').split('\0')
+
+        if nonce in self.request_futures:
+            # complete future thread-safely
+            future = self.request_futures[nonce]
+            loop = future.get_loop()
+
+            if pckt_type == PacketType.PING:
                 loop.call_soon_threadsafe(future.set_result, True)
+            elif pckt_type == PacketType.GET_REPLY:
+                loop.call_soon_threadsafe(future.set_result, msg_strings[0])
     
     async def ping(self):
         loop = asyncio.get_running_loop()
-        on_completed = loop.create_future()
 
         ping_nonce = bytes([random.randint(0,255) for _ in range(4)])
 
         start_time = time.time_ns()
+
+        on_completed = loop.create_future()
+        self.request_futures[ping_nonce] = on_completed
 
         self.client.get_device(self.dev_id).send(
             [PacketType.PING.value] +
             list(self.id) +
             list(ping_nonce)
         )
-
-        self.ping_queue[ping_nonce] = on_completed
 
         on_completed = asyncio.wait_for(on_completed, timeout=self.timeout)
 
@@ -112,7 +118,33 @@ class Session():
         except asyncio.exceptions.TimeoutError:
             print('ping timeout')
 
-        del self.ping_queue[ping_nonce]
+        del self.request_futures[ping_nonce]
+    
+    async def get(self, endpoint: str, data='', num_retransmit=4):
+        loop = asyncio.get_running_loop()
+
+        get_nonce = bytes([random.randint(0,255) for _ in range(4)])
+
+        for _ in range(num_retransmit):
+            on_completed = loop.create_future()
+            self.request_futures[get_nonce] = on_completed
+
+            self.client.get_device(self.dev_id).send(
+                [PacketType.GET.value] +
+                list(self.id) +
+                list(get_nonce) +
+                list(endpoint.encode(encoding='ascii')) + [0] +
+                list(data.encode(encoding='ascii'))
+            )
+
+            on_completed = asyncio.wait_for(on_completed, timeout=self.timeout/num_retransmit)
+
+            try:
+                return await on_completed
+            except asyncio.exceptions.TimeoutError:
+                print('get timeout')
+
+        del self.request_futures[get_nonce]
 
 
 class Client():

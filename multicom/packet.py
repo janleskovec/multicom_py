@@ -2,7 +2,7 @@ from enum import Enum, unique
 
 @unique
 class PacketType(Enum):
-    DISCOVERY       = 0 # discovery/reply packet (only returns identifier msg)
+    DISCOVERY       = 0 # discovery packet (only returns identifier msg)
     DISCOVERY_HELO  = 1 # discovery reply packet
     PING            = 2 # echo
     GET             = 3 # uses random nonce (does not prevent dupicate callbacks)
