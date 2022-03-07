@@ -4,7 +4,6 @@ from multicom import Client
 from multicom import UdpChannel
 
 import asyncio
-import time
 
 async def main():
     client = Client()
