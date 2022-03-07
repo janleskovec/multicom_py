@@ -81,8 +81,8 @@ class Session():
         pckt_type = PacketType(data[0])
         # session_id = data[1:5] # unused
         nonce = data[5:9]
+        #nonce_int = int.from_bytes(nonce, byteorder='big', signed=False)
         msg = data[9:]
-        msg_strings = msg.decode('ascii').split('\0')
 
         if nonce in self.request_futures:
             # complete future thread-safely
@@ -92,22 +92,25 @@ class Session():
             if pckt_type == PacketType.PING:
                 loop.call_soon_threadsafe(future.set_result, True)
             elif pckt_type == PacketType.GET_REPLY:
+                msg_strings = msg.decode('ascii').split('\0')
                 loop.call_soon_threadsafe(future.set_result, msg_strings[0])
+            elif pckt_type == PacketType.ACK:
+                loop.call_soon_threadsafe(future.set_result, True)
     
     async def ping(self):
         loop = asyncio.get_running_loop()
 
-        ping_nonce = bytes([random.randint(0,255) for _ in range(4)])
+        nonce = bytes([random.randint(0,255) for _ in range(4)])
 
         start_time = time.time_ns()
 
         on_completed = loop.create_future()
-        self.request_futures[ping_nonce] = on_completed
+        self.request_futures[nonce] = on_completed
 
         self.client.get_device(self.dev_id).send(
             [PacketType.PING.value] +
             list(self.id) +
-            list(ping_nonce)
+            list(nonce)
         )
 
         on_completed = asyncio.wait_for(on_completed, timeout=self.timeout)
@@ -118,21 +121,21 @@ class Session():
         except asyncio.exceptions.TimeoutError:
             print('ping timeout')
 
-        del self.request_futures[ping_nonce]
+        del self.request_futures[nonce]
     
     async def get(self, endpoint: str, data='', num_retransmit=4):
         loop = asyncio.get_running_loop()
 
-        get_nonce = bytes([random.randint(0,255) for _ in range(4)])
+        nonce = bytes([random.randint(0,255) for _ in range(4)])
 
         for _ in range(num_retransmit):
             on_completed = loop.create_future()
-            self.request_futures[get_nonce] = on_completed
+            self.request_futures[nonce] = on_completed
 
             self.client.get_device(self.dev_id).send(
                 [PacketType.GET.value] +
                 list(self.id) +
-                list(get_nonce) +
+                list(nonce) +
                 list(endpoint.encode(encoding='ascii')) + [0] +
                 list(data.encode(encoding='ascii'))
             )
@@ -144,7 +147,48 @@ class Session():
             except asyncio.exceptions.TimeoutError:
                 print('get timeout')
 
-        del self.request_futures[get_nonce]
+        del self.request_futures[nonce]
+    
+    def send(self, endpoint: str, data=''):
+
+        nonce = self.nonce.to_bytes(4, byteorder='big', signed=False)
+        self.nonce += 1
+
+        self.client.get_device(self.dev_id).send(
+            [PacketType.SEND.value] +
+            list(self.id) +
+            list(nonce) +
+            list(endpoint.encode(encoding='ascii')) + [0] +
+            list(data.encode(encoding='ascii'))
+        )
+    
+    async def post(self, endpoint: str, data='', num_retransmit=4):
+        loop = asyncio.get_running_loop()
+
+        nonce = self.nonce.to_bytes(4, byteorder='big', signed=False)
+        self.nonce += 1
+
+        for _ in range(num_retransmit):
+            on_completed = loop.create_future()
+            self.request_futures[nonce] = on_completed
+
+            self.client.get_device(self.dev_id).send(
+                [PacketType.POST.value] +
+                list(self.id) +
+                list(nonce) +
+                list(endpoint.encode(encoding='ascii')) + [0] +
+                list(data.encode(encoding='ascii'))
+            )
+
+            on_completed = asyncio.wait_for(on_completed, timeout=self.timeout/num_retransmit)
+
+            try:
+                return await on_completed
+            except asyncio.exceptions.TimeoutError:
+                print('post timeout')
+
+        del self.request_futures[nonce]
+
 
 
 class Client():
