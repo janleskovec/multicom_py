@@ -1,12 +1,7 @@
-from typing import List
-from typing import Callable
-
 import socket
 import asyncio
 import threading
 import ipaddress
-
-from multicom.packet import PacketType
 
 from .main import *
 
@@ -22,7 +17,7 @@ class UdpDevice(Device):
         self.addr = addr
         self.port = port
     
-    def send(self, data):
+    async def send(self, data):
         self.channel.sock.sendto(bytes(data), (self.addr, self.port))
 
 

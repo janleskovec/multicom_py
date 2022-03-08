@@ -2,6 +2,7 @@
 
 from multicom import Client
 from multicom import UdpChannel
+from multicom import BleChannel
 
 import asyncio
 import time
@@ -9,6 +10,7 @@ import time
 async def main():
     client = Client()
     client.add_channel(UdpChannel(subnet='192.168.1.0/24'))
+    client.add_channel(BleChannel())
 
     devices = await client.discover_wait()
     print('devices:', list(devices))
@@ -20,7 +22,7 @@ async def main():
         lost = 0
         ms_sum = 0
         start_time = time.time_ns()
-        for i in range(1000):
+        for i in range(100):
             ping_time = await session.ping()
             if ping_time != None:
                 ms_sum += ping_time

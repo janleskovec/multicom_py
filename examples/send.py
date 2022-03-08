@@ -2,12 +2,14 @@
 
 from multicom import Client
 from multicom import UdpChannel
+from multicom import BleChannel
 
 import asyncio
 
 async def main():
     client = Client()
     client.add_channel(UdpChannel(subnet='192.168.1.0/24'))
+    client.add_channel(BleChannel())
 
     devices = await client.discover_wait()
     print('devices:', list(devices))
@@ -17,6 +19,6 @@ async def main():
 
     with client.open(device_id) as session:
         for i in range(10):
-            session.send('setval', str(i))
+            await session.send('setval', str(i))
 
 if __name__  == '__main__': asyncio.run(main())

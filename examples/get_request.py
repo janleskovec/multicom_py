@@ -2,12 +2,14 @@
 
 from multicom import Client
 from multicom import UdpChannel
+from multicom import BleChannel
 
 import asyncio
 
 async def main():
     client = Client()
     client.add_channel(UdpChannel(subnet='192.168.1.0/24'))
+    client.add_channel(BleChannel())
 
     devices = await client.discover_wait()
     print('devices:', list(devices))

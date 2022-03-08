@@ -37,7 +37,7 @@ class Device():
     def __init__(self, dev_data: DiscoveryData):
         self.dev_data = dev_data
     
-    def send(self, data):
+    async def send(self, data):
         raise NotImplementedError("Please Implement this method")
 
 
@@ -67,7 +67,7 @@ class Session():
         self.client = client
         self.dev_id = dev_id
 
-        self.timeout = 4
+        self.timeout = 8
 
         self.nonce = 1 # must start with 1
         self.id = bytes([random.randint(0,255) for _ in range(4)])
@@ -109,7 +109,7 @@ class Session():
         on_completed = loop.create_future()
         self.request_futures[nonce] = on_completed
 
-        self.client.get_device(self.dev_id).send(
+        await self.client.get_device(self.dev_id).send(
             [PacketType.PING.value] +
             list(self.id) +
             list(nonce)
@@ -134,7 +134,7 @@ class Session():
             on_completed = loop.create_future()
             self.request_futures[nonce] = on_completed
 
-            self.client.get_device(self.dev_id).send(
+            await self.client.get_device(self.dev_id).send(
                 [PacketType.GET.value] +
                 list(self.id) +
                 list(nonce) +
@@ -151,12 +151,12 @@ class Session():
 
         del self.request_futures[nonce]
     
-    def send(self, endpoint: str, data=''):
+    async def send(self, endpoint: str, data=''):
 
         nonce = self.nonce.to_bytes(4, byteorder='big', signed=False)
         self.nonce += 1
 
-        self.client.get_device(self.dev_id).send(
+        await self.client.get_device(self.dev_id).send(
             [PacketType.SEND.value] +
             list(self.id) +
             list(nonce) +
@@ -174,7 +174,7 @@ class Session():
             on_completed = loop.create_future()
             self.request_futures[nonce] = on_completed
 
-            self.client.get_device(self.dev_id).send(
+            await self.client.get_device(self.dev_id).send(
                 [PacketType.POST.value] +
                 list(self.id) +
                 list(nonce) +
@@ -211,7 +211,7 @@ class Client():
         self.channels.append(channel)
         channel.client = self
 
-    def _on_msg(self, channel: Channel, data: bytes, extra_data):
+    def _on_msg(self, channel: Channel, data: bytes, extra_data) -> PacketType:
         pckt_type = PacketType(data[0])
         session_id = data[1:5]
         if pckt_type == PacketType.DISCOVERY_HELO:
@@ -221,6 +221,8 @@ class Client():
         else:
             if session_id in self.sessions:
                 self.sessions[session_id]._on_msg(data)
+        
+        return pckt_type
             
     
     def send_discover(self) -> Tuple[asyncio.AbstractEventLoop, List[asyncio.Task]]:
