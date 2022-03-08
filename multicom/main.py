@@ -203,9 +203,10 @@ class Client():
         self.sessions = {}
 
     def add_channel(self, channel: Channel):
-        # prevent duplicate channel types
-        for c in self.channels:
-            if type(c) == type(channel): return
+        # allow
+        ## prevent duplicate channel types
+        #for c in self.channels:
+        #    if type(c) == type(channel): return
         
         # add to list
         self.channels.append(channel)

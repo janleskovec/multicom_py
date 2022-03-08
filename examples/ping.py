@@ -1,4 +1,4 @@
-#import multicom
+#!/usr/bin/python3
 
 from multicom import Client
 from multicom import UdpChannel
@@ -10,6 +10,7 @@ import time
 async def main():
     client = Client()
     client.add_channel(UdpChannel(subnet='192.168.1.0/24'))
+    client.add_channel(UdpChannel(subnet='10.0.1.0/24'))
     client.add_channel(BleChannel())
 
     devices = await client.discover_wait()
