@@ -258,7 +258,7 @@ class Client():
     def __getitem__(self, key) -> Device:
         return self.get_device(key)
 
-    def open(self, dev_id: str):
+    def open(self, dev_id: str) -> Session:
         device = self.get_device(dev_id)
         if device != None:
             new_session = Session(self, dev_id)
