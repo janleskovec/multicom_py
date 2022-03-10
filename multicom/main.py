@@ -130,6 +130,8 @@ class Session():
 
         nonce = bytes([random.randint(0,255) for _ in range(4)])
 
+        res = None
+
         for _ in range(num_retransmit):
             on_completed = loop.create_future()
             self.request_futures[nonce] = on_completed
@@ -145,11 +147,13 @@ class Session():
             on_completed = asyncio.wait_for(on_completed, timeout=self.timeout/num_retransmit)
 
             try:
-                return await on_completed
+                res = await on_completed
             except asyncio.exceptions.TimeoutError:
                 print('get timeout')
 
         del self.request_futures[nonce]
+
+        return res
     
     async def send(self, endpoint: str, data=''):
 
@@ -170,6 +174,7 @@ class Session():
         nonce = self.nonce.to_bytes(4, byteorder='big', signed=False)
         self.nonce += 1
 
+        res = None
         for _ in range(num_retransmit):
             on_completed = loop.create_future()
             self.request_futures[nonce] = on_completed
@@ -185,11 +190,13 @@ class Session():
             on_completed = asyncio.wait_for(on_completed, timeout=self.timeout/num_retransmit)
 
             try:
-                return await on_completed
+                res = await on_completed
             except asyncio.exceptions.TimeoutError:
                 print('post timeout')
 
         del self.request_futures[nonce]
+
+        return res
 
 
 
